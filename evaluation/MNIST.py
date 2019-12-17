@@ -25,7 +25,7 @@ kernel_sizes = [3, 5, 7, 9]
 pool_sizes = [2, 3, 4]
 dense_units = [32, 64, 128, 256]
 drop_rates = [0.1, 0.2, 0.3, 0.4, 0.5]
-# Total combinations: 5x3x4x5 = 300
+# Total combinations: 4x3x4x5 = 240
 space = [kernel_sizes, pool_sizes, dense_units, drop_rates]
 epochs = 1
 
@@ -55,12 +55,12 @@ def evaluate(hyperparams, nepochs):
     loss, accuracy = model.evaluate(x_test, y_test)
     return accuracy
 
-def find_max_gp(n_evaluations):
+def find_max_gp(n_evaluations, savefiles=['points_gp.npy', 'values_gp.npy']):
     # Iterate for n_evaluations a gaussian process over the parameter space
     # Return array of evaluated points and array with corrisponding values
     gp = GaussianProcess(space_dim=len(space),
                                     length_scale=1,
-                                    noise=0,
+                                    noise=0.01,
                                     standardize=True)
     eval_point = [kernel_sizes[0],
                  pool_sizes[0],
@@ -74,35 +74,35 @@ def find_max_gp(n_evaluations):
         eval_point = gp.most_likely_max(space)
         argmax, max = gp.get_max()
         print('Current maximum at '+str(argmax)+' with value '+str(max))
+        np.save(savefiles[0], gp.known_points)
+        np.save(savefiles[1], gp.known_values)
     return gp.known_points, gp.known_values
 
 
-def find_max_grid_search():
+def find_max_grid_search(savefiles=['points_gs.npy', 'values_gs.npy']):
     # Iterate grid search for the whole parameter space
     # Return array of evaluated points and array with corresponding values
     combinations = list(it.product(*space))
-    eval_points = np.empty((len(combinations), len(space)))
-    values = np.empty(len(combinations))
+    eval_points = - np.ones((len(combinations), len(space)))
+    values = - np.ones(len(combinations))
     for i, hyperparams in enumerate(combinations):
         val = evaluate(hyperparams, epochs)
         eval_points[i] = hyperparams
         values[i] = val
+        np.save(savefiles[0], eval_points)
+        np.save(savefiles[1], values)
     return eval_points, values
 
 
 if __name__ == "__main__":
     # The goal is to compare the evolution of the gp evaluations against
     # the grid search starting from the same point
-    n_evaluations = 20
-    eval_points_gp, values_gp = find_max_gp(n_evaluations)
-    eval_points_gs, values_gs = find_max_grid_search()
+    n_evaluations = 240
     
     Path('eval_points_gp.npy').touch()
     Path('values_gp.npy').touch()
     Path('eval_points_gs.npy').touch()
     Path('values_gs.npy').touch()
-
-    np.save('eval_points_gp.npy', eval_points_gp)
-    np.save('eval_points_gs.npy', eval_points_gs)
-    np.save('values_gp.npy', values_gp)
-    np.save('values_gs.npy', values_gs) 
+    
+    eval_points_gp, values_gp = find_max_gp(n_evaluations)
+    eval_points_gs, values_gs = find_max_grid_search()
