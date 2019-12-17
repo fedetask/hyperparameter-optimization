@@ -15,3 +15,7 @@ To test the effectiveness of the GP Regression search for hyperparameter optimiz
 - Drop rates: [0.1, 0.2, 0.3, 0.4, 0.5]
 
 We use Adam optimizer with Sparse Categorical Cross Entropy loss. The parameter space is given by the cartesian product of the lists above, has dimension 4 and the total number of hyperparameter combinations is 240. Each combination is effectively a vector in this parameter space. We start from the same vector [3, 2, 32, 0.1] for both Grid Search and Gaussian Process. Grid Search tries all the possible combinations in the order returned by itertools.product(). Gaussian Process instead always goes to the combination that has the highest predicted probability of being better than the ones already known. Every time we evaluate a combination of hyperparameters we train the model for one epoch. 
+
+![alt text](https://github.com/fedetask/hyperparameter-optimization/blob/federico-dev/evaluation/figures/gp_vs_gs.png)
+
+As the plot shows, Gaussian Process is able to find hyperparameters that maximize the accuracy from the very first iterations, while grid search takes about 150 evaluations to find an equivalently good one
