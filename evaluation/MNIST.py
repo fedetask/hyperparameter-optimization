@@ -1,7 +1,11 @@
+import os
+import sys
 import numpy as np
 import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense, Conv2D, Dropout, Flatten, MaxPooling2D
+sys.path.append(os.path.abspath('../gaussian_process/'))
+from gaussian_process import GaussianProcess
 
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 # Reshaping the array to 4-dims so that it can work with the Keras API
@@ -15,18 +19,54 @@ x_test = x_test.astype('float32')
 x_train /= 255
 x_test /= 255
 
-model = Sequential()
-model.add(Conv2D(28, kernel_size=(3,3), input_shape=input_shape))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Flatten()) # Flattening the 2D arrays for fully connected layers
-model.add(Dense(128, activation=tf.nn.relu))
-model.add(Dropout(0.2))
-model.add(Dense(10,activation=tf.nn.softmax))
 
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-model.fit(x=x_train,y=y_train, epochs=10)
+def get_model(hyperparams):
+    ker_size, pool_size, dense_units, drop_rate = hyperparams
+    model = Sequential()
+    model.add(Conv2D(28, kernel_size=(ker_size, ker_size), input_shape=input_shape))
+    model.add(MaxPooling2D(pool_size=(pool_size, pool_size)))
+    model.add(Flatten()) # Flattening the 2D arrays for fully connected layers
+    model.add(Dense(dense_units, activation=tf.nn.relu))
+    model.add(Dropout(drop_rate))
+    model.add(Dense(10,activation=tf.nn.softmax))
 
-model.evaluate(x_test, y_test)
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+
+def evaluate(hyperparams, nepochs):
+    model = get_model(hyperparams)
+    model.fit(x=x_train,y=y_train, epochs=1)
+    loss, accuracy = model.evaluate(x_test, y_test)
+    return accuracy
+
+
+kernel_sizes = [3, 5, 7, 9]
+pool_sizes = [2, 3, 4]
+dense_units = [32, 64, 128, 256]
+drop_rates = [0.1, 0.2, 0.3, 0.4, 0.5]
+# Total combinations: 5x3x4x5 = 300
+space = [kernel_sizes, pool_sizes, dense_units, drop_rates]
+
+gp = GaussianProcess(space_dim=len(space),
+                                length_scale=1,
+                                noise=0,
+                                standardize=True)
+
+n_evaluations = 20
+epochs = 1
+eval_point = [kernel_sizes[0],
+             pool_sizes[0],
+             dense_units[0],
+             drop_rates[0]]
+
+for i in range(n_evaluations):
+    val = evaluate(eval_point, epochs)
+    print('Evaluated '+str(eval_point)+' with value '+str(val))
+    gp.add_points([eval_point], [val])
+    eval_point = gp.most_likely_max(space)
+    argmax, max = gp.get_max()
+    print('Current maximum at '+str(argmax)+' with value '+str(max))
 
